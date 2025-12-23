@@ -86,7 +86,7 @@ app_license = "mit"
 # ------------
 
 # before_install = "delight_shade.install.before_install"
-# after_install = "delight_shade.install.after_install"
+after_install = "delight_shade.custom_fields.setup_custom_fields"
 
 # Uninstallation
 # ------------
@@ -110,6 +110,10 @@ app_license = "mit"
 # before_app_uninstall = "delight_shade.utils.before_app_uninstall"
 # after_app_uninstall = "delight_shade.utils.after_app_uninstall"
 
+# Migration Events
+# ----------------
+after_migrate = "delight_shade.custom_fields.setup_custom_fields"
+
 # Desk Notifications
 # ------------------
 # See frappe.core.notifications.get_notification_config
@@ -132,13 +136,19 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Quotation": {
+		"validate": "delight_shade.sales_commission.distribute_commission"
+	},
+	"Sales Order": {
+		"validate": "delight_shade.sales_commission.distribute_commission"
+	},
+	"Sales Invoice": {
+		"validate": "delight_shade.sales_commission.distribute_commission",
+		"on_submit": "delight_shade.sales_commission.make_commission_gl_entries",
+		"on_cancel": "delight_shade.sales_commission.cancel_commission_gl_entries"
+	}
+}
 
 # Scheduled Tasks
 # ---------------
