@@ -1,0 +1,60 @@
+[
+    {
+        "doctype": "Product Bundle",
+        "name": "LED-PANEL-KIT",
+        "new_item_code": "LED-PANEL-KIT",
+        "description": "Complete LED Panel installation kit",
+        "items": [
+            {
+                "doctype": "Product Bundle Item",
+                "item_code": "LED-PANEL-60X60",
+                "qty": 1,
+                "description": "LED Panel 60x60"
+            },
+            {
+                "doctype": "Product Bundle Item",
+                "item_code": "LED-DRIVER-40W",
+                "qty": 1,
+                "description": "LED Driver 40W"
+            },
+            {
+                "doctype": "Product Bundle Item",
+                "item_code": "MOUNTING-BRACKET",
+                "qty": 2,
+                "description": "Mounting Bracket"
+            },
+            {
+                "doctype": "Product Bundle Item",
+                "item_code": "POWER-CABLE-2M",
+                "qty": 1,
+                "description": "Power Cable 2m"
+            }
+        ]
+    },
+    {
+        "doctype": "Product Bundle",
+        "name": "DOWNLIGHT-SET",
+        "new_item_code": "DOWNLIGHT-SET",
+        "description": "Complete downlight set with driver and lens",
+        "items": [
+            {
+                "doctype": "Product Bundle Item",
+                "item_code": "LED-DOWNLIGHT-15W",
+                "qty": 1,
+                "description": "LED Downlight 15W"
+            },
+            {
+                "doctype": "Product Bundle Item",
+                "item_code": "LED-DRIVER-40W",
+                "qty": 1,
+                "description": "LED Driver 40W"
+            },
+            {
+                "doctype": "Product Bundle Item",
+                "item_code": "DIFFUSER-LENS",
+                "qty": 1,
+                "description": "Diffuser Lens"
+            }
+        ]
+    }
+]

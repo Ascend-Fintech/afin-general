@@ -3,72 +3,206 @@ from frappe.utils import flt, getdate
 
 def distribute_commission(doc, method):
 	"""
-	Distributes custom additional charges to items.
-	Logic:
-	1. If percentage is set, calculate total charges based on Net Total.
-	2. Distribute charges to items based on their Net Amount.
-	3. Update Item Rate = Actual Rate + Allocated Charge per Qty.
+	Distributes custom additional charges to items based on Delight Shade Settings.
+	Modes:
+	1. Manual: Sum of Item Commissions -> Header Additional Charges.
+	2. Qty: Header Additional Charges -> Distribute based on Qty -> Item Commission.
+	3. Amount: Header Additional Charges -> Distribute based on Amount -> Item Commission.
 	"""
-	if not doc.get("custom_additional_charges") and not doc.get("custom_additional_charges_in_percentage"):
+	
+	try:
+		# Fetch Settings
+		settings = frappe.get_single("Delight Shade Settings")
+		distribution_mode = settings.additional_charges_based_on or "Amount"
+	except Exception:
+		# Fallback if settings doctype issue
+		distribution_mode = "Amount"
+
+	# Prepare items ensuring custom_actual_rate is set
+	_ensure_custom_actual_rate(doc)
+
+	# Logic for Manual Distribution (Bottom-Up)
+	if distribution_mode == "Manual":
+		# Sum Item Commissions to Header
+		total_commission = 0.0
+		for item in doc.items:
+			# Skip excluded items - ensure they have 0 commission
+			if item.get("custom_exclude_commission"):
+				item.custom_commission_amount = 0.0
+				continue
+				
+			total_commission += flt(item.custom_commission_amount)
+			# Update Rate based on manual commission
+			if flt(item.qty) > 0:
+				commission_per_qty = flt(item.custom_commission_amount) / flt(item.qty)
+				_set_item_rate(item, flt(item.custom_actual_rate) + commission_per_qty)
+			
+		doc.custom_additional_charges = total_commission
+		# Logic regarding percentage in manual mode:
+		# Recalculate percentage based on new Total amount vs Net Total
+		# This ensures consistency if they switch back to percentage view
+		total_net_amount = sum(flt(item.amount) for item in doc.items)
+		# Net amount includes commission currently. 
+		# Base net amount = sum(actual_rate * qty)
+		base_net_amount = sum(flt(item.custom_actual_rate) * flt(item.qty) for item in doc.items)
+		
+		if base_net_amount > 0:
+			doc.custom_additional_charges_in_percentage = (total_commission / base_net_amount) * 100.0
 		return
 
-	# Handle Percentage Calculation
+	# Logic for Auto Distribution (Top-Down)
+	
+	# Reset rates first to get clean base for calculation
+	_reset_item_rates(doc)
+	
+	# Case 1: Percentage Input - Calculate Absolute Amount first
 	if flt(doc.get("custom_additional_charges_in_percentage")) > 0:
-		# Calculate based on Net Total (sum of item net amounts)
-		# We need to be careful not to cycle endlessly if we update lines and trigger re-calc.
-		# Best to use the sum of *custom_actual_rate * qty* as the base, OR use the existing Net Total before modification.
-		# But since this runs on validate, we might run multiple times.
-		# Let's rely on Items to get the Total.
-		
-		# Reset Values to logic base if re-running
-		_reset_item_rates(doc)
-		
-		total_amount = sum(flt(item.amount) for item in doc.items)
-		if total_amount:
-			doc.custom_additional_charges = flt(doc.custom_additional_charges_in_percentage) * total_amount / 100.0
+		total_amount_base = sum(flt(item.custom_actual_rate or item.rate) * flt(item.qty) for item in doc.items)
+		if total_amount_base:
+			doc.custom_additional_charges = flt(doc.custom_additional_charges_in_percentage) * total_amount_base / 100.0
 
 	additional_charges = flt(doc.get("custom_additional_charges"))
 	
 	if not additional_charges:
+		# If charges are 0, ensure we clear item commissions
+		for item in doc.items:
+			item.custom_commission_amount = 0.0
 		return
 
-	# Re-calculate total to be safe (after reset)
-	total_amount = sum(flt(item.amount) for item in doc.items)
+	# Distribute based on Mode - Only include non-excluded items in totals
+	eligible_items = [item for item in doc.items if not item.get("custom_exclude_commission")]
+	excluded_items = [item for item in doc.items if item.get("custom_exclude_commission")]
 	
-	if not total_amount:
-		return
-
-	# Distribute
-	for item in doc.items:
-		# Ensure we have the base rate
-		if not item.get("custom_actual_rate"):
-			item.custom_actual_rate = item.rate
+	# Set excluded items commission to 0
+	for item in excluded_items:
+		item.custom_commission_amount = 0.0
+	
+	total_qty = sum(flt(item.qty) for item in eligible_items)
+	total_amount = sum(flt(item.custom_actual_rate or item.rate) * flt(item.qty) for item in eligible_items)
+	
+	remaining_charges = additional_charges
+	items_count = len(eligible_items)
+	
+	for i, item in enumerate(eligible_items):
+		allocated_commission = 0.0
 		
-		# Fraction of the total amount
-		item_proportion = flt(item.amount) / total_amount
-		allocated_commission = additional_charges * item_proportion
+		# Pro-rate Logic
+		if distribution_mode == "Qty":
+			if total_qty > 0:
+				allocated_commission = additional_charges * (flt(item.qty) / total_qty)
+		elif distribution_mode == "Amount":
+			if total_amount > 0:
+				# Use base amount for proportion
+				base_line_amount = flt(item.custom_actual_rate) * flt(item.qty)
+				allocated_commission = additional_charges * (base_line_amount / total_amount)
 		
-		# Commission per Unit
+		# Rounding
+		allocated_commission = flt(allocated_commission, item.precision("custom_commission_amount"))
+		
+		# Handle Last Item Dust
+		if i == items_count - 1:
+			# Difference check
+			currently_allocated = sum(flt(d.custom_commission_amount) for d in eligible_items[:i])
+			allocated_commission = additional_charges - currently_allocated
+			allocated_commission = flt(allocated_commission, item.precision("custom_commission_amount"))
+		
+		item.custom_commission_amount = allocated_commission
+		
+		# Apply to Rate
 		if flt(item.qty) > 0:
 			commission_per_qty = allocated_commission / flt(item.qty)
-			
-			# Update Rate
-			item.rate = flt(item.custom_actual_rate) + commission_per_qty
-			item.amount = item.rate * item.qty
-			
-			# Trigger standard calculations for taxes etc if needed? 
-			# In 'validate', standard Controller logic usually runs afterwards or we might need to manually trigger calculations 
-			# depending on if this hook is before or after standard validation.
-			# Ideally hooks are cleaner if we let standard logic handle tax re-calculation.
+			_set_item_rate(item, flt(item.custom_actual_rate) + commission_per_qty)
+
+def _ensure_custom_actual_rate(doc):
+	for item in doc.items:
+		if not item.get("custom_actual_rate") and flt(item.qty) > 0:
+			# Assuming current rate is the actual rate if not set
+			item.custom_actual_rate = item.rate
 
 def _reset_item_rates(doc):
 	"""
 	Helper: Resets rates to custom_actual_rate to ensure fresh calculation.
 	"""
 	for item in doc.items:
-		if item.get("custom_actual_rate") and flt(item.get("custom_actual_rate")) > 0:
-			item.rate = item.custom_actual_rate
-			item.amount = item.rate * item.qty
+		if item.get("custom_actual_rate"):
+			_set_item_rate(item, item.custom_actual_rate)
+
+def _set_item_rate(item, new_rate):
+	item.rate = flt(new_rate, item.precision("rate"))
+	item.amount = flt(item.rate * item.qty, item.precision("amount"))
+	
+	# Also update Net Values
+	item.net_rate = item.rate
+	item.net_amount = item.amount
+
+def _get_additional_charges_account():
+	"""Get commission account from Delight Shade Settings"""
+	try:
+		settings = frappe.get_single("Delight Shade Settings")
+		return settings.additional_charges_account
+	except Exception:
+		return None
+
+def create_additional_charges_je(doc, method):
+	"""
+	On Submit of Sales Order: Create a Draft Journal Entry to track additional charges.
+	"""
+	if not flt(doc.get("custom_additional_charges")):
+		return
+	
+	commission_amount = flt(doc.custom_additional_charges)
+	additional_charges_account = _get_additional_charges_account()
+	
+	if not additional_charges_account:
+		frappe.throw("Please configure Commission Account in Delight Shade Settings.")
+	
+	# Get Company's default cash/bank account
+	company_doc = frappe.get_doc("Company", doc.company)
+	cash_account = company_doc.default_cash_account or company_doc.default_bank_account
+	
+	if not cash_account:
+		frappe.throw("Please set a Default Cash or Bank Account in Company settings.")
+	
+	# Get contact info from Sales Order
+	contact_person = doc.get("contact_person") or ""
+	contact_mobile = doc.get("contact_mobile") or ""
+	contact_email = doc.get("contact_email") or ""
+	
+	# Create Journal Entry in Draft
+	je = frappe.new_doc("Journal Entry")
+	je.voucher_type = "Journal Entry"
+	je.company = doc.company
+	je.posting_date = frappe.utils.today()
+	je.user_remark = f"Additional Charges for Sales Order {doc.name}"
+	
+	# Set custom fields
+	je.custom_is_additional_charge = 1
+	je.custom_contact_person_name = contact_person
+	je.custom_contact_person_no = contact_mobile
+	je.custom_contact_person_mail = contact_email
+	
+	# Add accounts - Dr Commission Account, Cr Cash/Bank
+	je.append("accounts", {
+		"account": additional_charges_account,
+		"debit_in_account_currency": commission_amount,
+		"credit_in_account_currency": 0,
+		"party_type": "",
+		"party": "",
+		"cost_center": doc.cost_center
+	})
+	
+	je.append("accounts", {
+		"account": cash_account,
+		"debit_in_account_currency": 0,
+		"credit_in_account_currency": commission_amount,
+		"party_type": "",
+		"party": "",
+		"cost_center": doc.cost_center
+	})
+	
+	je.insert(ignore_permissions=True)
+	
+	frappe.msgprint(f"Draft Journal Entry <a href='/app/journal-entry/{je.name}'>{je.name}</a> created for Additional Charges.", alert=True)
 
 def make_commission_gl_entries(doc, method):
 	"""
@@ -78,14 +212,12 @@ def make_commission_gl_entries(doc, method):
 		return
 		
 	commission_amount = flt(doc.custom_additional_charges)
-	commission_account = doc.get("custom_commission_account")
+	additional_charges_account = _get_additional_charges_account()
 	
-	if not commission_account:
-		frappe.throw("Commission Account is missing but Additional Charges are set.")
+	if not additional_charges_account:
+		frappe.throw("Please configure Commission Account in Delight Shade Settings.")
 
-	# Debit Account: We need an Expense Account. 
-	# Strategy: Look for a default Expense Account or 'Commission' account.
-	# For now, let's try to find a default from Company settings or throw if not handled.
+	# Get default expense account
 	company_doc = frappe.get_doc("Company", doc.company)
 	expense_account = company_doc.default_expense_account
 	
@@ -101,7 +233,7 @@ def make_commission_gl_entries(doc, method):
 	# Credit Commission Account (Liability/Payable)
 	gl_entries.append(
 		doc.get_gl_dict({
-			"account": commission_account,
+			"account": additional_charges_account,
 			"credit": commission_amount,
 			"debit": 0.0,
 			"credit_in_account_currency": commission_amount,
@@ -120,7 +252,7 @@ def make_commission_gl_entries(doc, method):
 			"debit": commission_amount,
 			"credit_in_account_currency": 0.0,
 			"debit_in_account_currency": commission_amount,
-			"against": commission_account,
+			"against": additional_charges_account,
 			"cost_center": doc.cost_center,
 			"remarks": "Commission Expense against Invoice " + doc.name
 		})
@@ -136,11 +268,4 @@ def cancel_commission_gl_entries(doc, method):
 	if not flt(doc.get("custom_additional_charges")):
 		return
 		
-	# Logic is identical to creation, but make_gl_entries with cancel=True will handle reversal 
-	# IF we pass the same entries. 
-	# However, standard practice to reverse custom GL entries is often to just let the system handle it 
-	# via 'make_gl_entries' called again with cancel=True.
-	# But since we generated them dynamically, we need to regenerate them to cancel them 
-	# matching the original logic.
-	
 	make_commission_gl_entries(doc, method)

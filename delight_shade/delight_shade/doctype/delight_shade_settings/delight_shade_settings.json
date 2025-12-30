@@ -1,0 +1,63 @@
+{
+    "actions": [],
+    "allow_rename": 1,
+    "creation": "2024-12-29 20:30:00.000000",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+        "additional_charges_based_on",
+        "additional_charges_account",
+        "section_break_bundles",
+        "allow_packed_items_edit"
+    ],
+    "fields": [
+        {
+            "default": "Amount",
+            "fieldname": "additional_charges_based_on",
+            "fieldtype": "Select",
+            "label": "Additional Charges Based On",
+            "options": "Qty\nAmount\nManual"
+        },
+        {
+            "fieldname": "additional_charges_account",
+            "fieldtype": "Link",
+            "label": "Additional Charges Account",
+            "options": "Account",
+            "reqd": 1
+        },
+        {
+            "fieldname": "section_break_bundles",
+            "fieldtype": "Section Break",
+            "label": "Product Bundles"
+        },
+        {
+            "default": "0",
+            "fieldname": "allow_packed_items_edit",
+            "fieldtype": "Check",
+            "label": "Allow Editing Packed Items",
+            "description": "If enabled, allows editing Item and Qty in Packed Items table (Quotation/Delivery Note). Changes sync back to Product Bundle master."
+        }
+    ],
+    "issingle": 1,
+    "links": [],
+    "modified": "2025-12-30 11:40:00.000000",
+    "modified_by": "Administrator",
+    "module": "Delight Shade",
+    "name": "Delight Shade Settings",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "print": 1,
+            "read": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": []
+}

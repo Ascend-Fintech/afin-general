@@ -1,0 +1,82 @@
+[
+    {
+        "doctype": "Item",
+        "name": "LED-PANEL-60X60",
+        "item_code": "LED-PANEL-60X60",
+        "item_name": "LED Panel 60x60",
+        "item_group": "Products",
+        "stock_uom": "Nos",
+        "is_stock_item": 1,
+        "description": "60x60cm LED Panel for ceiling mounting"
+    },
+    {
+        "doctype": "Item",
+        "name": "LED-DRIVER-40W",
+        "item_code": "LED-DRIVER-40W",
+        "item_name": "LED Driver 40W",
+        "item_group": "Products",
+        "stock_uom": "Nos",
+        "is_stock_item": 1,
+        "description": "40W LED Driver for panel power supply"
+    },
+    {
+        "doctype": "Item",
+        "name": "MOUNTING-BRACKET",
+        "item_code": "MOUNTING-BRACKET",
+        "item_name": "Mounting Bracket",
+        "item_group": "Products",
+        "stock_uom": "Nos",
+        "is_stock_item": 1,
+        "description": "Universal mounting bracket for LED panels"
+    },
+    {
+        "doctype": "Item",
+        "name": "POWER-CABLE-2M",
+        "item_code": "POWER-CABLE-2M",
+        "item_name": "Power Cable 2m",
+        "item_group": "Products",
+        "stock_uom": "Nos",
+        "is_stock_item": 1,
+        "description": "2 meter power cable with connector"
+    },
+    {
+        "doctype": "Item",
+        "name": "LED-DOWNLIGHT-15W",
+        "item_code": "LED-DOWNLIGHT-15W",
+        "item_name": "LED Downlight 15W",
+        "item_group": "Products",
+        "stock_uom": "Nos",
+        "is_stock_item": 1,
+        "description": "15W recessed LED downlight"
+    },
+    {
+        "doctype": "Item",
+        "name": "DIFFUSER-LENS",
+        "item_code": "DIFFUSER-LENS",
+        "item_name": "Diffuser Lens",
+        "item_group": "Products",
+        "stock_uom": "Nos",
+        "is_stock_item": 1,
+        "description": "Frosted diffuser lens for even light distribution"
+    },
+    {
+        "doctype": "Item",
+        "name": "LED-PANEL-KIT",
+        "item_code": "LED-PANEL-KIT",
+        "item_name": "LED Panel Kit",
+        "item_group": "Products",
+        "stock_uom": "Nos",
+        "is_stock_item": 0,
+        "description": "Complete LED Panel installation kit"
+    },
+    {
+        "doctype": "Item",
+        "name": "DOWNLIGHT-SET",
+        "item_code": "DOWNLIGHT-SET",
+        "item_name": "Downlight Complete Set",
+        "item_group": "Products",
+        "stock_uom": "Nos",
+        "is_stock_item": 0,
+        "description": "Complete downlight set with driver and lens"
+    }
+]

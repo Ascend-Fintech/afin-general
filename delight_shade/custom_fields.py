@@ -7,13 +7,13 @@ def setup_custom_fields():
 	Hooked to: after_migrate and after_install
 	"""
 	
-	# Common fields for Header
+	# Common fields for Header (Commission Account now in Settings)
 	header_fields = [
 		{
 			"fieldname": "custom_additional_charges",
 			"label": "Additional Charges",
 			"fieldtype": "Currency",
-			"insert_after": "total_taxes_and_charges", # Try to place near totals
+			"insert_after": "total_taxes_and_charges",
 			"default": "0"
 		},
 		{
@@ -22,14 +22,6 @@ def setup_custom_fields():
 			"fieldtype": "Percent",
 			"insert_after": "custom_additional_charges",
 			"default": "0"
-		},
-		{
-			"fieldname": "custom_commission_account",
-			"label": "Commission Account",
-			"fieldtype": "Link",
-			"options": "Account",
-			"insert_after": "custom_additional_charges_in_percentage",
-			"mandatory_depends_on": "eval:doc.custom_additional_charges > 0 || doc.custom_additional_charges_in_percentage > 0"
 		}
 	]
 	
@@ -43,6 +35,23 @@ def setup_custom_fields():
 			"read_only": 1,
 			"insert_after": "rate",
 			"description": "Original Rate before Commission"
+		},
+		{
+			"fieldname": "custom_exclude_commission",
+			"label": "Exclude Commission",
+			"fieldtype": "Check",
+			"default": "0",
+			"insert_after": "custom_actual_rate",
+			"description": "If checked, commission will not be applied to this item"
+		},
+		{
+			"fieldname": "custom_commission_amount",
+			"label": "Commission Amount",
+			"fieldtype": "Currency",
+			"default": "0",
+			"read_only": 0,
+			"insert_after": "custom_exclude_commission",
+			"description": "Allocated Commission Amount"
 		}
 	]
 	

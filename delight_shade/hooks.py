@@ -26,7 +26,7 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/delight_shade/css/delight_shade.css"
-# app_include_js = "/assets/delight_shade/js/delight_shade.js"
+app_include_js = "/assets/delight_shade/js/packed_items_editable.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/delight_shade/css/delight_shade.css"
@@ -86,7 +86,13 @@ app_license = "mit"
 # ------------
 
 # before_install = "delight_shade.install.before_install"
-after_install = "delight_shade.custom_fields.setup_custom_fields"
+after_install = [
+	"delight_shade.custom_fields.setup_custom_fields",
+	"delight_shade.product_bundle_handler.apply_packed_items_override"
+]
+
+# Apply override on every app load
+on_session_creation = "delight_shade.product_bundle_handler.apply_packed_items_override"
 
 # Uninstallation
 # ------------
@@ -138,17 +144,25 @@ after_migrate = "delight_shade.custom_fields.setup_custom_fields"
 
 doc_events = {
 	"Quotation": {
-		"validate": "delight_shade.sales_commission.distribute_commission"
+		"before_validate": "delight_shade.sales_commission.distribute_commission",
+		"on_update": "delight_shade.product_bundle_handler.sync_packed_items_to_bundle"
 	},
 	"Sales Order": {
-		"validate": "delight_shade.sales_commission.distribute_commission"
+		"before_validate": "delight_shade.sales_commission.distribute_commission",
+		"on_submit": "delight_shade.sales_commission.create_additional_charges_je"
 	},
 	"Sales Invoice": {
-		"validate": "delight_shade.sales_commission.distribute_commission",
+		"before_validate": "delight_shade.sales_commission.distribute_commission",
 		"on_submit": "delight_shade.sales_commission.make_commission_gl_entries",
 		"on_cancel": "delight_shade.sales_commission.cancel_commission_gl_entries"
+	},
+	"Delivery Note": {
+		"on_update": "delight_shade.product_bundle_handler.sync_packed_items_to_bundle"
 	}
 }
+
+# Fixtures
+fixtures = ["Item", "Product Bundle"]
 
 # Scheduled Tasks
 # ---------------
