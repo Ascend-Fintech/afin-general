@@ -8,7 +8,13 @@
         "additional_charges_based_on",
         "additional_charges_account",
         "section_break_bundles",
-        "allow_packed_items_edit"
+        "allow_packed_items_edit",
+        "column_break_1",
+        "quotation",
+        "sales_order",
+        "column_break_2",
+        "delivery_note",
+        "sales_invoice"
     ],
     "fields": [
         {
@@ -28,19 +34,60 @@
         {
             "fieldname": "section_break_bundles",
             "fieldtype": "Section Break",
-            "label": "Product Bundles"
+            "label": "Editable Packed Items",
+            "description": "Enable editing of Item and Qty in Packed Items table. Changes sync back to Product Bundle master."
         },
         {
             "default": "0",
             "fieldname": "allow_packed_items_edit",
             "fieldtype": "Check",
-            "label": "Allow Editing Packed Items",
-            "description": "If enabled, allows editing Item and Qty in Packed Items table (Quotation/Delivery Note). Changes sync back to Product Bundle master."
+            "label": "Enable Packed Items Editing",
+            "description": "Master switch to enable/disable packed items editing feature"
+        },
+        {
+            "fieldname": "column_break_1",
+            "fieldtype": "Column Break"
+        },
+        {
+            "default": "0",
+            "fieldname": "quotation",
+            "fieldtype": "Check",
+            "label": "Quotation",
+            "description": "Allow editing packed items in Quotation",
+            "depends_on": "eval:doc.allow_packed_items_edit"
+        },
+        {
+            "default": "0",
+            "fieldname": "sales_order",
+            "fieldtype": "Check",
+            "label": "Sales Order",
+            "description": "Allow editing packed items in Sales Order",
+            "depends_on": "eval:doc.allow_packed_items_edit"
+        },
+        {
+            "fieldname": "column_break_2",
+            "fieldtype": "Column Break"
+        },
+        {
+            "default": "0",
+            "fieldname": "delivery_note",
+            "fieldtype": "Check",
+            "label": "Delivery Note",
+            "description": "Allow editing packed items in Delivery Note",
+            "depends_on": "eval:doc.allow_packed_items_edit"
+        },
+        {
+            "default": "0",
+            "fieldname": "sales_invoice",
+            "fieldtype": "Check",
+            "label": "Sales Invoice",
+            "description": "Allow editing packed items in Sales Invoice",
+            "depends_on": "eval:doc.allow_packed_items_edit"
         }
     ],
     "issingle": 1,
     "links": [],
-    "modified": "2025-12-30 11:40:00.000000",
+    "modified": "2026-01-02 11:50:00.000000",
     "modified_by": "Administrator",
     "module": "Delight Shade",
     "name": "Delight Shade Settings",

@@ -144,20 +144,36 @@ after_migrate = "delight_shade.custom_fields.setup_custom_fields"
 
 doc_events = {
 	"Quotation": {
-		"before_validate": "delight_shade.sales_commission.distribute_commission",
-		"on_update": "delight_shade.product_bundle_handler.sync_packed_items_to_bundle"
+		"onload": "delight_shade.product_bundle_handler.apply_overrides_on_load",
+		"before_validate": [
+			"delight_shade.product_bundle_handler.capture_packed_items_changes",
+			"delight_shade.sales_commission.distribute_commission"
+		],
+		"on_update": "delight_shade.product_bundle_handler.restore_packed_items_changes"
 	},
 	"Sales Order": {
-		"before_validate": "delight_shade.sales_commission.distribute_commission",
-		"on_submit": "delight_shade.sales_commission.create_additional_charges_je"
+		"onload": "delight_shade.product_bundle_handler.apply_overrides_on_load",
+		"before_validate": [
+			"delight_shade.product_bundle_handler.capture_packed_items_changes",
+			"delight_shade.sales_commission.distribute_commission"
+		],
+		"on_submit": "delight_shade.sales_commission.create_additional_charges_je",
+		"on_update": "delight_shade.product_bundle_handler.restore_packed_items_changes"
 	},
 	"Sales Invoice": {
-		"before_validate": "delight_shade.sales_commission.distribute_commission",
+		"onload": "delight_shade.product_bundle_handler.apply_overrides_on_load",
+		"before_validate": [
+			"delight_shade.product_bundle_handler.capture_packed_items_changes",
+			"delight_shade.sales_commission.distribute_commission"
+		],
 		"on_submit": "delight_shade.sales_commission.make_commission_gl_entries",
-		"on_cancel": "delight_shade.sales_commission.cancel_commission_gl_entries"
+		"on_cancel": "delight_shade.sales_commission.cancel_commission_gl_entries",
+		"on_update": "delight_shade.product_bundle_handler.restore_packed_items_changes"
 	},
 	"Delivery Note": {
-		"on_update": "delight_shade.product_bundle_handler.sync_packed_items_to_bundle"
+		"onload": "delight_shade.product_bundle_handler.apply_overrides_on_load",
+		"before_validate": "delight_shade.product_bundle_handler.capture_packed_items_changes",
+		"on_update": "delight_shade.product_bundle_handler.restore_packed_items_changes"
 	}
 }
 

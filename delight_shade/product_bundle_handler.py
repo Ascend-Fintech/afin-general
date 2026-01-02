@@ -1,109 +1,138 @@
 import frappe
 from frappe.utils import flt
 
-def sync_packed_items_to_bundle(doc, method):
+def capture_packed_items_changes(doc, method):
 	"""
-	On save of Quotation/Delivery Note: Sync Packed Items changes back to Product Bundle master.
-	Also removes extra packed items that exceed the bundle definition and updates descriptions.
-	Only runs if setting is enabled.
+	Before validate: Capture user edits to packed_items and store in override fields.
+	This runs BEFORE ERPNext's make_packing_list regenerates the items.
 	"""
-	try:
-		settings = frappe.get_single("Delight Shade Settings")
-		if not settings.allow_packed_items_edit:
-			return
-	except Exception as e:
-		frappe.log_error(f"Error fetching settings: {e}")
+	if not doc.get("packed_items"):
+		return
+	
+	# Store current values in the override fields for persistence
+	for item in doc.packed_items:
+		# Check if user has edited this item (compare with what bundle would have)
+		# For now, just store current values - they will be restored after ERPNext regenerates
+		if item.item_code and flt(item.qty) > 0:
+			# Store in doc.flags for later restoration
+			if not getattr(doc.flags, 'packed_items_edits', None):
+				doc.flags.packed_items_edits = {}
+			
+			# Use parent_item + idx as key
+			key = f"{item.parent_item}:{item.idx}"
+			doc.flags.packed_items_edits[key] = {
+				"item_code": item.item_code,
+				"qty": flt(item.qty),
+				"custom_is_overridden": item.get("custom_is_overridden") or 0,
+				"custom_override_item_code": item.get("custom_override_item_code") or "",
+				"custom_override_qty": item.get("custom_override_qty") or 0
+			}
+
+def restore_packed_items_changes(doc, method):
+	"""
+	On update: Restore packed_items from override fields or from captured edits.
+	This ensures user edits persist even after ERPNext regenerates from Product Bundle.
+	"""
+	if not is_packed_items_edit_allowed_for_doctype(doc.doctype):
 		return
 	
 	if not doc.get("packed_items"):
 		return
 	
-	# Group packed items by parent_item (the bundle item)
+	edits = getattr(doc.flags, 'packed_items_edits', {})
+	
+	items_to_delete = []
+	
+	# Group by parent_item
 	packed_by_parent = {}
+	for item in doc.packed_items:
+		parent = item.parent_item
+		if parent not in packed_by_parent:
+			packed_by_parent[parent] = []
+		packed_by_parent[parent].append(item)
 	
-	for packed_item in doc.packed_items:
-		parent_item = packed_item.parent_item
-		if parent_item not in packed_by_parent:
-			packed_by_parent[parent_item] = []
-		packed_by_parent[parent_item].append(packed_item)
-	
-	# Check each bundle and remove extras
-	items_to_remove = []
-	
-	for bundle_item_code, packed_items in packed_by_parent.items():
-		# Get the expected count from Product Bundle
-		if frappe.db.exists("Product Bundle", bundle_item_code):
-			bundle = frappe.get_doc("Product Bundle", bundle_item_code)
-			expected_count = len(bundle.items)
-			
-			# If we have more packed items than bundle items, remove the extras (from the end)
-			if len(packed_items) > expected_count:
-				# The extras are at the end - they are the old replaced items
-				extras = packed_items[expected_count:]
-				items_to_remove.extend(extras)
-	
-	# Remove extra items
-	if items_to_remove:
-		for item in items_to_remove:
-			doc.packed_items.remove(item)
+	for parent_item, items in packed_by_parent.items():
+		# Count expected items from our edits for this parent
+		expected_keys = [k for k in edits.keys() if k.startswith(f"{parent_item}:")]
+		expected_count = len(expected_keys)
 		
-		# Reindex
-		for i, item in enumerate(doc.packed_items):
-			item.idx = i + 1
-		
-		# Delete extras from database
-		for item in items_to_remove:
-			if item.name:
-				frappe.db.sql("""DELETE FROM `tabPacked Item` WHERE name = %s""", item.name)
-		frappe.db.commit()
-	
-	# Rebuild packed_by_parent after removal
-	packed_by_parent = {}
-	for packed_item in doc.packed_items:
-		parent_item = packed_item.parent_item
-		if parent_item not in packed_by_parent:
-			packed_by_parent[parent_item] = []
-		packed_by_parent[parent_item].append(packed_item)
-	
-	# Now sync changes to Product Bundle
-	for bundle_item_code, packed_items in packed_by_parent.items():
-		if not frappe.db.exists("Product Bundle", bundle_item_code):
+		if expected_count == 0:
 			continue
 		
-		bundle = frappe.get_doc("Product Bundle", bundle_item_code)
-		bundle_updated = False
+		# Remove extras
+		if len(items) > expected_count:
+			extras = items[expected_count:]
+			for extra in extras:
+				if extra.name:
+					items_to_delete.append(extra.name)
 		
-		# Match by position (order) in the items list
-		for i, packed_item in enumerate(packed_items):
-			if i < len(bundle.items):
-				bundle_row = bundle.items[i]
-				item_name = frappe.db.get_value("Item", packed_item.item_code, "item_name") or packed_item.item_code
+		# Restore values for valid items
+		for i, item in enumerate(items[:expected_count]):
+			key = f"{parent_item}:{i + 1}"
+			edit = edits.get(key)
+			
+			if edit:
+				item_name = frappe.db.get_value("Item", edit["item_code"], "item_name") or edit["item_code"]
 				
-				# Update item_code if changed
-				if bundle_row.item_code != packed_item.item_code:
-					bundle_row.item_code = packed_item.item_code
-					bundle_row.description = item_name
-					bundle_updated = True
-				
-				# Update qty - always sync from packed_item to bundle
-				packed_qty = flt(packed_item.qty)
-				if flt(bundle_row.qty) != packed_qty:
-					bundle_row.qty = packed_qty
-					bundle_updated = True
-				
-				# Update packed_item row in database
-				frappe.db.set_value("Packed Item", packed_item.name, {
-					"description": item_name,
+				# Update in database with override fields
+				frappe.db.set_value("Packed Item", item.name, {
+					"item_code": edit["item_code"],
+					"qty": edit["qty"],
 					"item_name": item_name,
-					"qty": packed_qty
+					"description": item_name,
+					"custom_is_overridden": 1,
+					"custom_override_item_code": edit["item_code"],
+					"custom_override_qty": edit["qty"]
 				}, update_modified=False)
+	
+	# Delete extras
+	for name in items_to_delete:
+		frappe.db.delete("Packed Item", name)
+	
+	frappe.db.commit()
+
+def apply_overrides_on_load(doc, method):
+	"""
+	On load: Apply stored overrides to packed_items.
+	This ensures overridden values are shown even when ERPNext loads from Product Bundle.
+	"""
+	if not is_packed_items_edit_allowed_for_doctype(doc.doctype):
+		return
+	
+	if not doc.get("packed_items"):
+		return
+	
+	for item in doc.packed_items:
+		if item.get("custom_is_overridden") and item.get("custom_override_item_code"):
+			# Apply the override
+			item.item_code = item.custom_override_item_code
+			item.qty = flt(item.custom_override_qty) or item.qty
+			item_name = frappe.db.get_value("Item", item.item_code, "item_name") or item.item_code
+			item.item_name = item_name
+			item.description = item_name
+
+def is_packed_items_edit_allowed_for_doctype(doctype):
+	"""Check if packed items editing is allowed for a specific doctype via Settings"""
+	try:
+		settings = frappe.get_single("Delight Shade Settings")
 		
-		if bundle_updated:
-			bundle.flags.ignore_permissions = True
-			bundle.flags.ignore_validate = True
-			bundle.save()
-			frappe.db.commit()
-			frappe.msgprint(f"Product Bundle '{bundle_item_code}' updated.", alert=True)
+		if not settings.allow_packed_items_edit:
+			return False
+		
+		doctype_field_map = {
+			"Quotation": "quotation",
+			"Sales Order": "sales_order",
+			"Delivery Note": "delivery_note",
+			"Sales Invoice": "sales_invoice"
+		}
+		
+		field = doctype_field_map.get(doctype)
+		if field:
+			return bool(getattr(settings, field, False))
+		
+		return False
+	except Exception:
+		return False
 
 def is_packed_items_edit_allowed():
 	"""Check if packed items editing is allowed via Settings"""
@@ -114,8 +143,10 @@ def is_packed_items_edit_allowed():
 		return False
 
 @frappe.whitelist()
-def get_packed_items_edit_setting():
+def get_packed_items_edit_setting(doctype=None):
 	"""API to check setting from client side"""
+	if doctype:
+		return is_packed_items_edit_allowed_for_doctype(doctype)
 	return is_packed_items_edit_allowed()
 
 def apply_packed_items_override():

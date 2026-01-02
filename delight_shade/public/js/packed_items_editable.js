@@ -1,21 +1,51 @@
 // Delight Shade - Packed Items Editable
-// Makes item_code and qty editable in packed_items table if setting is enabled
+// Makes item_code and qty editable in packed_items table if setting is enabled for that doctype
 
 frappe.ui.form.on('Quotation', {
     refresh: function (frm) {
-        setup_editable_packed_items(frm);
+        setup_editable_packed_items(frm, 'Quotation');
     },
     onload: function (frm) {
-        setup_editable_packed_items(frm);
+        setup_editable_packed_items(frm, 'Quotation');
+    },
+    after_save: function (frm) {
+        reload_after_packed_items_edit(frm, 'Quotation');
+    }
+});
+
+frappe.ui.form.on('Sales Order', {
+    refresh: function (frm) {
+        setup_editable_packed_items(frm, 'Sales Order');
+    },
+    onload: function (frm) {
+        setup_editable_packed_items(frm, 'Sales Order');
+    },
+    after_save: function (frm) {
+        reload_after_packed_items_edit(frm, 'Sales Order');
     }
 });
 
 frappe.ui.form.on('Delivery Note', {
     refresh: function (frm) {
-        setup_editable_packed_items(frm);
+        setup_editable_packed_items(frm, 'Delivery Note');
     },
     onload: function (frm) {
-        setup_editable_packed_items(frm);
+        setup_editable_packed_items(frm, 'Delivery Note');
+    },
+    after_save: function (frm) {
+        reload_after_packed_items_edit(frm, 'Delivery Note');
+    }
+});
+
+frappe.ui.form.on('Sales Invoice', {
+    refresh: function (frm) {
+        setup_editable_packed_items(frm, 'Sales Invoice');
+    },
+    onload: function (frm) {
+        setup_editable_packed_items(frm, 'Sales Invoice');
+    },
+    after_save: function (frm) {
+        reload_after_packed_items_edit(frm, 'Sales Invoice');
     }
 });
 
@@ -58,13 +88,16 @@ frappe.ui.form.on('Packed Item', {
     }
 });
 
-function setup_editable_packed_items(frm) {
+function setup_editable_packed_items(frm, doctype) {
     if (!frm.fields_dict.packed_items) {
         return;
     }
 
     frappe.call({
         method: 'delight_shade.product_bundle_handler.get_packed_items_edit_setting',
+        args: {
+            doctype: doctype
+        },
         async: false,
         callback: function (r) {
             if (r.message) {
@@ -73,6 +106,23 @@ function setup_editable_packed_items(frm) {
                 frm.fields_dict.packed_items.grid.update_docfield_property('qty', 'read_only', 0);
 
                 frm.refresh_field('packed_items');
+            }
+        }
+    });
+}
+
+function reload_after_packed_items_edit(frm, doctype) {
+    // Only reload if packed items editing is enabled for this doctype
+    frappe.call({
+        method: 'delight_shade.product_bundle_handler.get_packed_items_edit_setting',
+        args: {
+            doctype: doctype
+        },
+        async: false,
+        callback: function (r) {
+            if (r.message && frm.doc.packed_items && frm.doc.packed_items.length > 0) {
+                // Reload the document to show updated packed_items values
+                frm.reload_doc();
             }
         }
     });

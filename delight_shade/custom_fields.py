@@ -64,6 +64,36 @@ def setup_custom_fields():
 		"Quotation Item": item_fields,
 		"Sales Order Item": item_fields,
 		"Sales Invoice Item": item_fields,
+		
+		# Packed Item override fields - for persistent storage of manual edits
+		"Packed Item": [
+			{
+				"fieldname": "custom_is_overridden",
+				"label": "Is Overridden",
+				"fieldtype": "Check",
+				"default": "0",
+				"hidden": 1,
+				"insert_after": "qty",
+				"description": "Set when user manually edits this packed item"
+			},
+			{
+				"fieldname": "custom_override_item_code",
+				"label": "Override Item Code",
+				"fieldtype": "Link",
+				"options": "Item",
+				"hidden": 1,
+				"insert_after": "custom_is_overridden",
+				"description": "Stores the manually selected item code"
+			},
+			{
+				"fieldname": "custom_override_qty",
+				"label": "Override Qty",
+				"fieldtype": "Float",
+				"hidden": 1,
+				"insert_after": "custom_override_item_code",
+				"description": "Stores the manually entered quantity"
+			}
+		]
 	}
 	
 	# Filter out fields that already exist to avoid overwriting/updating if user modified them
