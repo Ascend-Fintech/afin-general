@@ -20,6 +20,9 @@ def distribute_commission(doc, method):
 
 	# Prepare items ensuring custom_actual_rate is set
 	_ensure_custom_actual_rate(doc)
+	
+	# Check for manual rate changes by user and update custom_actual_rate
+	_update_actual_rate_from_user_input(doc)
 
 	# Logic for Manual Distribution (Bottom-Up)
 	if distribution_mode == "Manual":
@@ -118,6 +121,32 @@ def _ensure_custom_actual_rate(doc):
 		if not item.get("custom_actual_rate") and flt(item.qty) > 0:
 			# Assuming current rate is the actual rate if not set
 			item.custom_actual_rate = item.rate
+
+def _update_actual_rate_from_user_input(doc):
+	"""
+	Detect if user Manually changed the Rate.
+	If Rate has changed, we assume they want to change the BASE price.
+	New Base = New Rate - (Previous Commission per Qty)
+	"""
+	for item in doc.items:
+		# Only relevant if we have existing commission
+		if flt(item.custom_commission_amount) == 0:
+			continue
+			
+		current_rate = flt(item.rate)
+		# Calculate what the rate SHOULD be based on known base + comm
+		expected_rate = flt(item.custom_actual_rate) + (flt(item.custom_commission_amount) / flt(item.qty) if flt(item.qty) else 0)
+		
+		# Allow for tiny floating point differences
+		if abs(current_rate - expected_rate) > 0.01:
+			# User changed the rate!
+			# Infer new base.
+			# Rate = Base + (Comm / Qty)  =>  Base = Rate - (Comm / Qty)
+			comm_per_qty = flt(item.custom_commission_amount) / flt(item.qty) if flt(item.qty) else 0
+			new_base = current_rate - comm_per_qty
+			
+			# Update the base.
+			item.custom_actual_rate = flt(new_base, item.precision("rate"))
 
 def _reset_item_rates(doc):
 	"""
